@@ -10,7 +10,7 @@ spec:
     repoURL: 'https://github.com/ashishK-dev-coder/corebank-enterprise-architecture.git'
     targetRevision: main
     # Point to the specific folder holding your Helm charts
-    path: helm-charts/corebank-apps
+    path: corebank-infrastructure/helm-charts/corebank-apps
   destination:
     # Deploy to the cluster ArgoCD is currently running inside
     server: 'https://kubernetes.default.svc'
