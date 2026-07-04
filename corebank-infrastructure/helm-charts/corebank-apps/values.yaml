@@ -5,7 +5,7 @@ frontend:
   name: corebank-frontend
   replicas: 1
   image:
-    repository: localhost:5000/corebank-frontend
+    repository: ashish97webdev1devops/corebank-frontend
     tag: "latest"
   ingress:
     enabled: true
@@ -16,7 +16,7 @@ apiGateway:
   name: corebank-api-gateway
   replicas: 1
   image:
-    repository: localhost:5000/corebank-api-gateway
+    repository: ashish97webdev1devops/corebank-api-gateway
     tag: "latest"
   secrets:
     jwtSecret: "c3VwZXJfc2VjcmV0X2Jhbmtpbmdfa2V5" # base64 encoded "super_secret_banking_key"
@@ -28,14 +28,14 @@ identityService:
   name: corebank-identity-service
   replicas: 1
   image:
-    repository: localhost:5000/corebank-identity-service
+    repository: ashish97webdev1devops/corebank-identity-service
     tag: "latest"
 
 transactionEngine:
   name: corebank-transaction-engine
   replicas: 1
   image:
-    repository: localhost:5000/corebank-transaction-engine
+    repository: ashish97webdev1devops/corebank-transaction-engine
     tag: "latest"
   resources:
     requests:
