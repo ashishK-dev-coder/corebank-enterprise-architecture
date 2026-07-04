@@ -54,3 +54,11 @@ class TransferRequest(BaseModel):
 - **Root Cause:** In the Helm `values.yaml`, we tagged our images with `:latest`. By default, when Kubernetes sees the `:latest` tag, it tries to pull the image from Docker Hub (`docker.io`).
 - **Why It Happened:** The container images (`corebank-workspace-api-gateway`, etc.) were built exclusively on the local Docker daemon using Docker Compose. They do not exist on the public internet, so Docker Hub threw a `401 Unauthorized` error when K8s tried to pull them.
 - **The Fix:** We explicitly overridden Kubernetes' default behavior by injecting `imagePullPolicy: Never` into all the container specs in our Helm templates. This forces K8s to bypass Docker Hub and consume the local images directly from the host machine's Docker engine cache.
+
+---
+
+### Problem 6: Kubernetes Fails to Find Local Images (ErrImageNeverPull)
+- **Symptom:** After applying `imagePullPolicy: Never`, the Pods were stuck in `ErrImageNeverPull`. 
+- **Root Cause:** The images were successfully built on the host machine using Docker Compose. However, the Kubernetes engine inside Docker Desktop runs in a completely isolated `containerd` runtime environment. It physically cannot see the images residing in the host's Docker daemon cache.
+- **Why It Happened:** In production, Kubernetes always pulls from a centralized Container Registry (like AWS ECR or Docker Hub). Expecting it to read from a local developer's cache is an anti-pattern.
+- **The Fix:** We spun up a local Docker Registry (`docker run -d -p 5000:5000 registry:2`) to mimic a true production environment. We tagged and pushed our local images into `localhost:5000`, removed the `imagePullPolicy` overrides, and updated the Helm `values.yaml` to pull directly from the registry.
