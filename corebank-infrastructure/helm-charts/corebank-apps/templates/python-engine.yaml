@@ -16,6 +16,7 @@ spec:
       containers:
         - name: engine
           image: "{{ .Values.transactionEngine.image.repository }}:{{ .Values.transactionEngine.image.tag }}"
+          imagePullPolicy: Never
           ports:
             - containerPort: 8000
           resources:
