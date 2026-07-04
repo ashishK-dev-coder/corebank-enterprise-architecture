@@ -45,3 +45,12 @@ class TransferRequest(BaseModel):
 - **Root Cause:** The advanced GitOps Helm charts attempted to deploy `VirtualService` and `PeerAuthentication` resources, but the local Docker Desktop Kubernetes cluster did not understand what those objects were.
 - **Why It Happened:** Standard Kubernetes clusters do not come with a Service Mesh built-in. Istio Custom Resource Definitions (CRDs) must be explicitly installed into the cluster by the Infrastructure team before application developers can leverage them.
 - **The Fix:** We downloaded the official Istio installation binary (`istioctl`) and injected the Istio Control Plane (the `demo` profile) directly into the local Kubernetes cluster, giving the API Server the vocabulary it needed to accept the advanced routing rules.
+
+---
+
+### Problem 5: K8s Fails to Pull Local Docker Images (ErrImagePull)
+- **Symptom:** ArgoCD synced successfully, but the Pods were stuck in `ImagePullBackOff` with the error:
+  `ErrImagePull: ... pull access denied, repository does not exist or may require authorization`.
+- **Root Cause:** In the Helm `values.yaml`, we tagged our images with `:latest`. By default, when Kubernetes sees the `:latest` tag, it tries to pull the image from Docker Hub (`docker.io`).
+- **Why It Happened:** The container images (`corebank-workspace-api-gateway`, etc.) were built exclusively on the local Docker daemon using Docker Compose. They do not exist on the public internet, so Docker Hub threw a `401 Unauthorized` error when K8s tried to pull them.
+- **The Fix:** We explicitly overridden Kubernetes' default behavior by injecting `imagePullPolicy: Never` into all the container specs in our Helm templates. This forces K8s to bypass Docker Hub and consume the local images directly from the host machine's Docker engine cache.
