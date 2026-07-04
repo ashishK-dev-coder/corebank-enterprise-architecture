@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     # Point this to your infrastructure repository
-    repoURL: 'https://github.com/yourusername/corebank-infrastructure.git'
+    repoURL: 'https://github.com/ashishK-dev-coder/corebank-enterprise-architecture.git'
     targetRevision: main
     # Point to the specific folder holding your Helm charts
     path: helm-charts/corebank-apps
