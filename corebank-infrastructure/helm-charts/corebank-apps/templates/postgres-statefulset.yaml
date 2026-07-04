@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.postgres.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  serviceName: {{ .Values.postgres.name }}-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.postgres.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.postgres.name }}
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: corebank-secrets
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: corebank-secrets
+                  key: DB_PASSWORD
+            - name: POSTGRES_DB
+              value: corebank
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: {{ .Values.postgres.storage.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.postgres.name }}-headless
+  namespace: {{ .Values.global.namespace }}
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Values.postgres.name }}
+  ports:
+    - port: 5432
+      targetPort: 5432

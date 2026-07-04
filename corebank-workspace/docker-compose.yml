@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./corebank-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+
+  api-gateway:
+    build: ./corebank-api-gateway
+    ports:
+      - "4000:4000"
+    environment:
+      - IDENTITY_URL=http://identity-service:5000
+      - TRANSACTION_URL=http://transaction-engine:8000
+    depends_on:
+      - identity-service
+      - transaction-engine
+
+  identity-service:
+    build: ./corebank-identity-go
+    ports:
+      - "5000:5000"
+    environment:
+      - JWT_SECRET=super_secret_banking_key
+
+  transaction-engine:
+    build: ./corebank-transaction-python
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres-db
+      - DB_USER=corebank_user
+      - DB_PASS=corebank_pass
+      - DB_NAME=corebank
+      - JWT_SECRET=super_secret_banking_key
+    depends_on:
+      - postgres-db
+
+  postgres-db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=corebank_user
+      - POSTGRES_PASSWORD=corebank_pass
+      - POSTGRES_DB=corebank
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Mount your SQL script to auto-create the tables on startup
+      - ./corebank-transaction-python/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  pgdata:

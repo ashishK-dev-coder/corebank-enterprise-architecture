@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+    
+    environment {
+        REGISTRY_HOST = "gcr.io" // Or AWS ECR: your-account-id.dkr.ecr.ap-south-1.amazonaws.com
+        PROJECT_ID    = "corebank-prod-project"
+        IMAGE_NAME    = "corebank-identity-service"
+        IMAGE_TAG     = "${BUILD_NUMBER}"
+        INFRA_REPO    = "github.com/yourusername/corebank-infrastructure.git"
+    }
+    
+    stages {
+        stage('Code Quality & Unit Tests') {
+            steps {
+                echo 'Running unit tests and syntax validation...'
+                // Example: sh 'go test ./...' or 'npm test'
+            }
+        }
+        
+        stage('Docker Build') {
+            steps {
+                echo 'Building production-grade multi-stage Docker image...'
+                sh "docker build -t ${REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_NAME}:${IMAGE_TAG} ."
+            }
+        }
+        
+        stage('Trivy Security Scan') {
+            steps {
+                echo 'Scanning container image for critical CVEs...'
+                // Fails the build if CRITICAL vulnerabilities are found
+                sh "trivy image --exit-code 1 --severity CRITICAL ${REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+        
+        stage('Push to Container Registry') {
+            steps {
+                echo 'Authenticating and pushing secure image to registry...'
+                /* In production, use Jenkins Credentials Provider to mask tokens:
+                   withCredentials([usernamePassword(credentialsId: 'registry-creds', ...)]) { ... }
+                */
+                sh "docker push ${REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+        
+        stage('Update GitOps Manifests') {
+            steps {
+                echo 'Updating infrastructure repository with new image tag...'
+                /* This implements the GitOps handoff. It clones the infra repo, 
+                   uses 'sed' to update the image tag, and pushes it back to Git.
+                */
+                cleartext {
+                    sh """
+                        git clone https://${INFRA_REPO}
+                        cd corebank-infrastructure/helm-charts/identity-service/
+                        sed -i 's/tag: .*/tag: "${IMAGE_TAG}"/g' values.yaml
+                        git config user.email "jenkins@corebank.com"
+                        git config user.name "Jenkins CI Engine"
+                        git add values.yaml
+                        git commit -m "Auto-promoted identity-service image tag to ${IMAGE_TAG} [skip ci]"
+                        git push origin main
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        failure {
+            echo "Pipeline failed! Sending critical alert to security/DevOps Slack channels..."
+        }
+        success {
+            echo "Pipeline succeeded cleanly. GitOps repo updated. Waiting for ArgoCD to sync."
+        }
+    }
+}

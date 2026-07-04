@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.identityService.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: {{ .Values.identityService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.identityService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.identityService.name }}
+    spec:
+      containers:
+        - name: identity
+          image: "{{ .Values.identityService.image.repository }}:{{ .Values.identityService.image.tag }}"
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: corebank-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.identityService.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: {{ .Values.identityService.name }}
+  ports:
+    - port: 5000
+      targetPort: 5000

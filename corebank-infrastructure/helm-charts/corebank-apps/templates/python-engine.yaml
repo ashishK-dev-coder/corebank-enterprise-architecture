@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.transactionEngine.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: {{ .Values.transactionEngine.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.transactionEngine.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.transactionEngine.name }}
+    spec:
+      containers:
+        - name: engine
+          image: "{{ .Values.transactionEngine.image.repository }}:{{ .Values.transactionEngine.image.tag }}"
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              memory: {{ .Values.transactionEngine.resources.requests.memory | quote }}
+              cpu: {{ .Values.transactionEngine.resources.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.transactionEngine.resources.limits.memory | quote }}
+              cpu: {{ .Values.transactionEngine.resources.limits.cpu | quote }}
+          envFrom:
+            - secretRef:
+                name: corebank-secrets
+            - configMapRef:
+                name: corebank-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.transactionEngine.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.transactionEngine.name }}
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: strict-mtls-engine
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.transactionEngine.name }}
+  mtls:
+    mode: STRICT

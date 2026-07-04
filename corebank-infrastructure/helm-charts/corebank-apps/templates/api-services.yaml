@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: corebank-config
+  namespace: {{ .Values.global.namespace }}
+data:
+  AUTH_SERVICE_URL: {{ .Values.apiGateway.config.authServiceUrl | quote }}
+  TRANSACTION_SERVICE_URL: {{ .Values.apiGateway.config.transactionServiceUrl | quote }}
+  DB_HOST: "{{ .Values.postgres.name }}-headless.{{ .Values.global.namespace }}.svc.cluster.local"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: corebank-secrets
+  namespace: {{ .Values.global.namespace }}
+type: Opaque
+data:
+  JWT_SECRET: {{ .Values.apiGateway.secrets.jwtSecret }}
+  DB_USER: Y29yZWJhbmtfdXNlcg== # "corebank_user"
+  DB_PASSWORD: c3VwZXJfc2VjcmV0X2JhbmtpbmdfcGFzcw== # "super_secret_banking_pass"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.apiGateway.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: {{ .Values.apiGateway.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.apiGateway.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.apiGateway.name }}
+    spec:
+      containers:
+        - name: gateway
+          image: "{{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag }}"
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - configMapRef:
+                name: corebank-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.apiGateway.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  selector:
+    app: {{ .Values.apiGateway.name }}
+  ports:
+    - port: 4000
+      targetPort: 4000
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: api-gateway-routing
+  namespace: {{ .Values.global.namespace }}
+spec:
+  hosts:
+    - {{ .Values.apiGateway.name }}
+  http:
+    - match:
+        - uri:
+            prefix: /api/v1/auth
+      route:
+        - destination:
+            host: {{ .Values.apiGateway.name }}
+            port:
+              number: 4000

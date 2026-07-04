@@ -1,0 +1,55 @@
+global:
+  namespace: prod-fintech
+
+frontend:
+  name: corebank-frontend
+  replicas: 1
+  image:
+    repository: corebank-workspace-frontend
+    tag: "latest"
+  ingress:
+    enabled: true
+    host: my-fintech-app.com
+    tlsSecretName: frontend-tls-cert
+
+apiGateway:
+  name: corebank-api-gateway
+  replicas: 1
+  image:
+    repository: corebank-workspace-api-gateway
+    tag: "latest"
+  secrets:
+    jwtSecret: "c3VwZXJfc2VjcmV0X2Jhbmtpbmdfa2V5" # base64 encoded "super_secret_banking_key"
+  config:
+    authServiceUrl: "http://corebank-identity-service:5000"
+    transactionServiceUrl: "http://corebank-transaction-engine:8000"
+
+identityService:
+  name: corebank-identity-service
+  replicas: 1
+  image:
+    repository: corebank-workspace-identity-service
+    tag: "latest"
+
+transactionEngine:
+  name: corebank-transaction-engine
+  replicas: 1
+  image:
+    repository: corebank-workspace-transaction-engine
+    tag: "latest"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+postgres:
+  name: corebank-postgres
+  image:
+    repository: postgres
+    tag: "15-alpine"
+  storage:
+    size: 10Gi
+    storageClass: standard

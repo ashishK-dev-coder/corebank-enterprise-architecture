@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: corebank-production
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # Point this to your infrastructure repository
+    repoURL: 'https://github.com/yourusername/corebank-infrastructure.git'
+    targetRevision: main
+    # Point to the specific folder holding your Helm charts
+    path: helm-charts/corebank-apps
+  destination:
+    # Deploy to the cluster ArgoCD is currently running inside
+    server: 'https://kubernetes.default.svc'
+    namespace: prod-fintech
+  syncPolicy:
+    # This turns on the magic! ArgoCD will automatically deploy changes.
+    automated:
+      prune: true
+      selfHeal: true
