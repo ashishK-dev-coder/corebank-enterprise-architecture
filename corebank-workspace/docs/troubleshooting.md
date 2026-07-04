@@ -61,4 +61,20 @@ class TransferRequest(BaseModel):
 - **Symptom:** After applying `imagePullPolicy: Never`, the Pods were stuck in `ErrImageNeverPull`. 
 - **Root Cause:** The images were successfully built on the host machine using Docker Compose. However, the Kubernetes engine inside Docker Desktop runs in a completely isolated `containerd` runtime environment. It physically cannot see the images residing in the host's Docker daemon cache.
 - **Why It Happened:** In production, Kubernetes always pulls from a centralized Container Registry (like AWS ECR or Docker Hub). Expecting it to read from a local developer's cache is an anti-pattern.
-- **The Fix:** We spun up a local Docker Registry (`docker run -d -p 5000:5000 registry:2`) to mimic a true production environment. We tagged and pushed our local images into `localhost:5000`, removed the `imagePullPolicy` overrides, and updated the Helm `values.yaml` to pull directly from the registry.
+- **The Fix:** We spun up a local Docker Registry (`docker run -d -p 5000:5000 registry:2`) to mimic a true production environment. We tagged and pushed our local images into `localhost:5000`, removed the `imagePullPolicy` overrides, and updated the Helm `values.yaml` to pull directly from the registry. *(Update: Docker Desktop's aggressive `registry-mirror` proxy eventually forced us to push natively to a public Docker Hub account).*
+
+---
+
+### Problem 7: ArgoCD Stuck on Old "Ghost" ReplicaSets
+- **Symptom:** After pushing new images to Docker Hub and syncing ArgoCD, the new pods were spinning up correctly, but the old broken `localhost:5000` pods were permanently stuck in `ImagePullBackOff`. 
+- **Root Cause:** Kubernetes' built-in Zero-Downtime Rolling Update mechanism prevents old pods from being deleted until the new pods become `100% Ready`. 
+- **Why It Happened:** Because the new pods were taking a long time to become `Ready` (due to Istio initialization issues), Kubernetes refused to terminate the old ReplicaSet. ArgoCD got "stuck" trying to manage two conflicting ReplicaSets simultaneously.
+- **The Fix:** We forcefully executed a manual prune (`kubectl delete deployment --all -n prod-fintech`). Because ArgoCD is a declarative GitOps engine, it immediately detected the missing Deployments, triggered its "Self-Heal" loop, and recreated the resources entirely from scratch using only the newest GitHub configuration.
+
+---
+
+### Problem 8: Istio Sidecar DNS Starvation (Connection Refused)
+- **Symptom:** The new Pods successfully pulled the Docker Hub images but were stuck in `1/2 Running` state. The kubelet events showed: `Startup probe failed: dial tcp 15021: connect: connection refused`.
+- **Root Cause:** The Istio sidecar (`istio-proxy` / Envoy) was crashing during initialization because it was timing out on UDP DNS queries to CoreDNS (`10.96.0.10:53`). 
+- **Why It Happened:** We deployed a massive 4-tier microservice architecture, a Prometheus Monitoring Stack, and an Istio Service Mesh on a local Docker Desktop VM. The local VM maxed out its CPU/Memory buffers, dropping UDP packets and starving the heavy Envoy proxies. This is a local development constraint, not a production bug.
+- **The Fix:** We disabled Istio injection on the local namespace (`kubectl label namespace prod-fintech istio-injection-`) and restarted the pods. This allowed the microservices to spin up cleanly (`1/1 Running`) without the heavy Envoy proxy, bypassing the laptop-crashing resource starvation while keeping the advanced K8s YAML configuration completely valid in Git.
