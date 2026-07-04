@@ -37,7 +37,6 @@ spec:
       containers:
         - name: gateway
           image: "{{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag }}"
-          imagePullPolicy: Never
           ports:
             - containerPort: 4000
           envFrom:
